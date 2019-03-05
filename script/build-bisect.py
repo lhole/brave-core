@@ -55,6 +55,7 @@ def get_releases(repo):
     print('fetching releases from GitHub...')
 
     while not done:
+        # for more info, see: https://developer.github.com/v3/guides/traversing-with-pagination/
         get_data = {
             'page': page,
             'per_page': 100
