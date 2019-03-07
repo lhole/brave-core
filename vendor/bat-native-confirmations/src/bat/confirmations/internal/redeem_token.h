@@ -11,6 +11,7 @@
 #include <map>
 
 #include "bat/confirmations/confirmations_client.h"
+#include "bat/confirmations/confirmation_type.h"
 
 #include "wrapper.hpp"
 
@@ -34,23 +35,27 @@ class RedeemToken {
   ~RedeemToken();
 
   void Redeem(
-      const std::string& creative_instance_id);
+      const std::string& creative_instance_id,
+      const ConfirmationType confirmation_type);
 
  private:
   void CreateConfirmation(
       const std::string& creative_instance_id,
-      const UnblindedToken& unblinded_token);
+      const UnblindedToken& unblinded_token,
+      const ConfirmationType confirmation_type);
   void OnCreateConfirmation(
       const std::string& url,
       const int response_status_code,
       const std::string& response,
       const std::map<std::string, std::string>& headers,
+      const ConfirmationType confirmation_type,
       const std::string& confirmation_id,
       const Token& payment_token,
       const BlindedToken& blinded_payment_token,
       const UnblindedToken& unblinded_token);
 
   void FetchPaymentToken(
+      const ConfirmationType confirmation_type,
       const std::string& confirmation_id,
       const Token& payment_token,
       const BlindedToken& blinded_payment_token,
@@ -60,6 +65,7 @@ class RedeemToken {
       const int response_status_code,
       const std::string& response,
       const std::map<std::string, std::string>& headers,
+      const ConfirmationType confirmation_type,
       const Token& payment_token,
       const BlindedToken& blinded_payment_token,
       const UnblindedToken& unblinded_token);

@@ -45,7 +45,9 @@ RedeemToken::~RedeemToken() {
   BLOG(INFO) << "Deinitializing redeem token";
 }
 
-void RedeemToken::Redeem(const std::string& creative_instance_id) {
+void RedeemToken::Redeem(
+    const std::string& creative_instance_id,
+    const ConfirmationType confirmation_type) {
   DCHECK(!creative_instance_id.empty());
 
   BLOG(INFO) << "Redeem";
@@ -56,14 +58,15 @@ void RedeemToken::Redeem(const std::string& creative_instance_id) {
   }
 
   auto unblinded_token = unblinded_tokens_->GetToken();
-  CreateConfirmation(creative_instance_id, unblinded_token);
+  CreateConfirmation(creative_instance_id, unblinded_token, confirmation_type);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 void RedeemToken::CreateConfirmation(
     const std::string& creative_instance_id,
-    const UnblindedToken& unblinded_token) {
+    const UnblindedToken& unblinded_token,
+    const ConfirmationType confirmation_type) {
   DCHECK(!creative_instance_id.empty());
 
   BLOG(INFO) << "CreateConfirmation";
@@ -87,7 +90,7 @@ void RedeemToken::CreateConfirmation(
   auto confirmation_id = base::GenerateGUID();
 
   auto payload = request.CreateConfirmationRequestDTO(creative_instance_id,
-      blinded_payment_token);
+      blinded_payment_token, confirmation_type);
 
   auto credential = request.CreateCredential(unblinded_token, payload);
 
@@ -111,7 +114,7 @@ void RedeemToken::CreateConfirmation(
   BLOG(INFO) << "  Content_type: " << content_type;
 
   auto callback = std::bind(&RedeemToken::OnCreateConfirmation,
-      this, url, _1, _2, _3, confirmation_id, payment_token,
+      this, url, _1, _2, _3, confirmation_type, confirmation_id, payment_token,
       blinded_payment_token, unblinded_token);
 
   confirmations_client_->LoadURL(url, headers, body, content_type,
@@ -123,6 +126,7 @@ void RedeemToken::OnCreateConfirmation(
     const int response_status_code,
     const std::string& response,
     const std::map<std::string, std::string>& headers,
+    const ConfirmationType confirmation_type,
     const std::string& confirmation_id,
     const Token& payment_token,
     const BlindedToken& blinded_payment_token,
@@ -175,11 +179,12 @@ void RedeemToken::OnCreateConfirmation(
   }
 
   // Fetch payment token
-  FetchPaymentToken(confirmation_id, payment_token, blinded_payment_token,
-      unblinded_token);
+  FetchPaymentToken(confirmation_type, confirmation_id, payment_token,
+      blinded_payment_token, unblinded_token);
 }
 
 void RedeemToken::FetchPaymentToken(
+    const ConfirmationType confirmation_type,
     const std::string& confirmation_id,
     const Token& payment_token,
     const BlindedToken& blinded_payment_token,
@@ -199,8 +204,8 @@ void RedeemToken::FetchPaymentToken(
   auto method = request.GetMethod();
 
   auto callback = std::bind(&RedeemToken::OnFetchPaymentToken,
-      this, url, _1, _2, _3, payment_token, blinded_payment_token,
-      unblinded_token);
+      this, url, _1, _2, _3, confirmation_type, payment_token,
+      blinded_payment_token, unblinded_token);
 
   confirmations_client_->LoadURL(url, {}, "", "", method, callback);
 }
@@ -210,6 +215,7 @@ void RedeemToken::OnFetchPaymentToken(
     const int response_status_code,
     const std::string& response,
     const std::map<std::string, std::string>& headers,
+    const ConfirmationType confirmation_type,
     const Token& payment_token,
     const BlindedToken& blinded_payment_token,
     const UnblindedToken& unblinded_token) {
@@ -361,8 +367,8 @@ void RedeemToken::OnFetchPaymentToken(
       << estimated_redemption_value << " BAT, you now have "
       << unblinded_payment_tokens_->Count() << " unblinded payment tokens";
 
-  confirmations_->AppendEstimatedRedemptionValueToTransactionHistory(
-      estimated_redemption_value);
+  confirmations_->AppendTransactionToTransactionHistory(
+      estimated_redemption_value, confirmation_type);
 
   OnRedeem(SUCCESS, unblinded_token);
 }
