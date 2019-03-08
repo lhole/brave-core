@@ -1,5 +1,5 @@
 diff --git a/components/sync/driver/glue/sync_backend_host_core.cc b/components/sync/driver/glue/sync_backend_host_core.cc
-index 2bbe1dadae8202bb35eaac9fa069d6ab12b08ce6..fdc92f5eddf4382ad7e26d62c63eb9f92d64acc5 100644
+index 2bbe1dadae8202bb35eaac9fa069d6ab12b08ce6..d7862a3c86a1d720474720196ae9ffc6cf657c51 100644
 --- a/components/sync/driver/glue/sync_backend_host_core.cc
 +++ b/components/sync/driver/glue/sync_backend_host_core.cc
 @@ -413,12 +413,13 @@ void SyncBackendHostCore::DoInitialProcessControlTypes() {
@@ -21,13 +21,4 @@ index 2bbe1dadae8202bb35eaac9fa069d6ab12b08ce6..fdc92f5eddf4382ad7e26d62c63eb9f9
 +  // }
  
    DCHECK_EQ(user_share->directory->cache_guid(), sync_manager_->cache_guid());
-   host_.Call(FROM_HERE,
-@@ -531,6 +532,8 @@ void SyncBackendHostCore::DoFinishConfigureDataTypes(
- 
-   const ModelTypeSet failed_configuration_types =
-       Difference(types_to_config, sync_manager_->InitialSyncEndedTypes());
-+  LOG(ERROR) << types_to_config;
-+  LOG(ERROR) << sync_manager_->InitialSyncEndedTypes();
-   const ModelTypeSet succeeded_configuration_types =
-       Difference(types_to_config, failed_configuration_types);
    host_.Call(FROM_HERE,

@@ -10,6 +10,8 @@ AccountInfo GetDummyAccountInfo();
 
 #include "brave/components/brave_sync/brave_sync_prefs.h"
 #include "brave/components/brave_sync/brave_sync_service_observer.h"
+#include "brave/components/brave_sync/jslib_const.h"
+#include "brave/components/brave_sync/jslib_messages.h"
 #include "brave/components/brave_sync/settings.h"
 #include "brave/components/brave_sync/sync_devices.h"
 #include "brave/components/brave_sync/tools.h"
@@ -18,6 +20,19 @@ AccountInfo GetDummyAccountInfo();
 #include "net/base/network_interfaces.h"
 
 namespace browser_sync {
+
+using brave_sync::jslib::Device;
+using brave_sync::jslib::SyncRecord;
+using brave_sync::jslib_const::SyncObjectData_DEVICE;
+using brave_sync::jslib_const::SyncRecordType_PREFERENCES;
+using brave_sync::RecordsList;
+using brave_sync::RecordsListPtr;
+using brave_sync::StrFromUint8Array;
+using brave_sync::SyncDevice;
+using brave_sync::SyncRecordPtr;
+using brave_sync::tools::IsTimeEmpty;
+using brave_sync::Uint8Array;
+using brave_sync::Uint8ArrayFromString;
 
 namespace {
 
@@ -53,12 +68,30 @@ AccountInfo GetDummyAccountInfo() {
   return account_info;
 }
 
+RecordsListPtr CreateDeviceCreationRecordExtension(
+  const std::string& deviceName,
+  const std::string& objectId,
+  const SyncRecord::Action &action,
+  const std::string& deviceId) {
+  RecordsListPtr records = std::make_unique<RecordsList>();
+
+  SyncRecordPtr record = std::make_unique<SyncRecord>();
+
+  record->action = action;
+  record->deviceId = deviceId;
+  record->objectId = objectId;
+  record->objectData = SyncObjectData_DEVICE;  // "device"
+
+  std::unique_ptr<Device> device = std::make_unique<Device>();
+  device->name = deviceName;
+  record->SetDevice(std::move(device));
+
+  records->emplace_back(std::move(record));
+
+  return records;
 }
 
-using brave_sync::RecordsList;
-using brave_sync::StrFromUint8Array;
-using brave_sync::Uint8Array;
-using brave_sync::Uint8ArrayFromString;
+}
 
 void ProfileSyncService::OnSetupSyncHaveCode(const std::string& sync_words,
     const std::string& device_name) {
@@ -116,7 +149,6 @@ void ProfileSyncService::OnSetupSyncNewToSync(
 
 void ProfileSyncService::OnDeleteDevice(const std::string& device_id) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-#if 0
   auto sync_devices = brave_sync_prefs_->GetSyncDevices();
 
   const SyncDevice *device = sync_devices->GetByDeviceId(device_id);
@@ -124,9 +156,8 @@ void ProfileSyncService::OnDeleteDevice(const std::string& device_id) {
     const std::string device_name = device->name_;
     const std::string object_id = device->object_id_;
     SendDeviceSyncRecord(
-        jslib::SyncRecord::Action::A_DELETE, device_name, device_id, object_id);
+        SyncRecord::Action::A_DELETE, device_name, device_id, object_id);
   }
-#endif
 }
 
 void ProfileSyncService::OnResetSync() {
@@ -356,9 +387,10 @@ void ProfileSyncService::OnResolvedSyncRecords(
     const std::string& category_name,
     std::unique_ptr<RecordsList> records) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-#if 0
   if (category_name == brave_sync::jslib_const::kPreferences) {
     OnResolvedPreferences(*records.get());
+  }
+#if 0
   } else if (category_name == brave_sync::jslib_const::kBookmarks) {
     bookmark_change_processor_->ApplyChangesFromSyncModel(*records.get());
     bookmark_change_processor_->SendUnsynced(unsynced_send_interval_);
@@ -417,9 +449,78 @@ void ProfileSyncService::ResetSyncInternal() {
   brave_sync_prefs_->SetSyncEnabled(false);
 }
 
+void ProfileSyncService::SendCreateDevice() {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+
+  std::string device_name = brave_sync_prefs_->GetThisDeviceName();
+  std::string object_id = brave_sync::tools::GenerateObjectId();
+  std::string device_id = brave_sync_prefs_->GetThisDeviceId();
+  CHECK(!device_id.empty());
+
+  SendDeviceSyncRecord(
+      SyncRecord::Action::A_CREATE,
+      device_name,
+      device_id,
+      object_id);
+}
+
+void ProfileSyncService::SendDeviceSyncRecord(
+    const int action,
+    const std::string& device_name,
+    const std::string& device_id,
+    const std::string& object_id) {
+  DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
+  RecordsListPtr records = CreateDeviceCreationRecordExtension(
+      device_name,
+      object_id,
+      static_cast<SyncRecord::Action>(action),
+      device_id);
+  GetBraveSyncClient()->SendSyncRecords(
+      SyncRecordType_PREFERENCES, *records);
+}
+
 brave_sync::BraveSyncClient* ProfileSyncService::GetBraveSyncClient() {
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
   return sync_client_->GetBraveSyncClient();
+}
+
+void ProfileSyncService::OnResolvedPreferences(const RecordsList& records) {
+  const std::string this_device_id = brave_sync_prefs_->GetThisDeviceId();
+  bool this_device_deleted = false;
+  bool contains_only_one_device = false;
+
+  auto sync_devices = brave_sync_prefs_->GetSyncDevices();
+  for (const auto &record : records) {
+    DCHECK(record->has_device() || record->has_sitesetting());
+    if (record->has_device()) {
+      bool actually_merged = false;
+      sync_devices->Merge(
+          SyncDevice(record->GetDevice().name,
+          record->objectId,
+          record->deviceId,
+          record->syncTimestamp.ToJsTime()),
+          record->action,
+          &actually_merged);
+      this_device_deleted = this_device_deleted ||
+        (record->deviceId == this_device_id &&
+          record->action == SyncRecord::Action::A_DELETE &&
+          actually_merged);
+      contains_only_one_device = sync_devices->size() < 2 &&
+        record->action == SyncRecord::Action::A_DELETE &&
+          actually_merged;
+    }
+  }  // for each device
+
+  brave_sync_prefs_->SetSyncDevices(*sync_devices);
+
+  if (this_device_deleted) {
+    ResetSyncInternal();
+  } else if (contains_only_one_device) {
+    // We see amount of devices had been decreased to 1 and it is not this
+    // device had been deleted. So call OnResetSync which will send DELETE
+    // record for this device
+    OnResetSync();
+  }
 }
 
 void ProfileSyncService::OnBraveSyncPrefsChanged(const std::string& pref) {
@@ -491,6 +592,12 @@ void ProfileSyncService::OnNudgeSyncCycle(){
 
 void ProfileSyncService::OnPollSyncCycle(){
   LOG(ERROR) << __func__;
+
+  if (IsTimeEmpty(brave_sync_prefs_->GetLastFetchTime()))
+    SendCreateDevice();
+  GetBraveSyncClient()->SendFetchSyncDevices();
+  // FetchSyncRecords(bookmarks, history, preferences, 1000);
+  brave_sync_prefs_->SetLastFetchTime(base::Time::Now());
 }
 
 }   // namespace browser_sync
