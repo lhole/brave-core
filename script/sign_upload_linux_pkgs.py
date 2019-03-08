@@ -235,7 +235,7 @@ def parse_args():
 
     parser = argparse.ArgumentParser(
         description=desc, formatter_class=RawTextHelpFormatter)
-    parser.add_argument('-c', '--channel', help='The Brave channel, i.e. \'release\', \'beta\', \'dev\'', required=True)
+    parser.add_argument('-c', '--channel', help='The Brave channel, i.e. \'release\', \'beta\', \'dev\', \'nightly\', required=True)
     parser.add_argument('-d', '--debug', action='store_true', help='Print debug output')
     parser.add_argument('-g', '--github_token', help='GitHub token to use for downloading releases', required=True)
     parser.add_argument('-k', '--gpg_full_key_id', help='GPG full key id to use for signing '

@@ -18,8 +18,9 @@ def channels():
 def get_channel_display_name():
     raw = channels()
     d = {
-        'canary': 'Canary',
-        raw[1]: 'Developer',
+        # 'canary': 'Canary',
+        raw[0]: 'Nightly',
+        raw[1]: 'Dev',
         raw[2]: 'Beta',
         raw[3]: 'Release'
     }

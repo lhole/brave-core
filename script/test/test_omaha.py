@@ -26,7 +26,7 @@ class TestOmahaLib(unittest.TestCase):
         os.environ['PLATFORM'] = 'win32'
         mock_get_platform.return_value = PLATFORM
         # print("DEBUG: PLATFORM: {}".format(PLATFORM))
-        for CHANNEL in ['beta', 'dev', 'release']:
+        for CHANNEL in ['nightly', 'dev', 'beta', 'release']:
             os.environ['CHANNEL'] = CHANNEL
             # print("DEBUG: CHANNEL: {}".format(CHANNEL))
             for TARGET_ARCH in ['x64', 'ia32']:

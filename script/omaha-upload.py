@@ -256,7 +256,7 @@ def remove_github_downloaded_files(file_list, logging):
 def parse_args():
     desc = "Upload Windows/Mac install files to Omaha server" \
            "\n\nRequires the following ENVIRONMENT VARIABLES be set:" \
-           "\n\nCHANNEL: The Brave channel, i.e. \'release\', \'beta\', \'dev\'" \
+           "\n\nCHANNEL: The Brave channel, i.e. \'release\', \'beta\', \'dev\', \'nightly\'" \
            "\nOMAHA_HOST: The FQDN hostname of the Omaha server to upload to. (without \'https:\\\\' prefix)" \
            "\nOMAHA_USER: The UserID to use to login to the Omaha server." \
            "\nOMAHA_PASS: The Password to login to the Omaha server." \
